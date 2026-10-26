@@ -15,8 +15,7 @@ rounds wins the match.
   arena edge that shrinks, round and match results, and rematch. It works with a
   keyboard or touch.
 
-For now, AI drivers fill the open seats. Live online play between devices is
-the next milestone (see the roadmap below).
+Online room support is being added in the multiplayer setup branch. The frontend needs the separately hosted WebSocket server before room codes work across devices. See [MULTIPLAYER_SETUP.md](./MULTIPLAYER_SETUP.md) for the free Render deployment steps.
 
 ## How to play
 
