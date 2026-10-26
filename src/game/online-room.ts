@@ -1,4 +1,4 @@
-import { Simulation, IDLE_INPUT } from './sim'
+import { Simulation } from './sim'
 import type { GameEvent, GameState, PlayerInput, PlayerSeat } from './sim'
 import type { RoomClient } from './room'
 import { getMultiplayerId, sendMultiplayer, subscribeMultiplayer } from './online-network'
