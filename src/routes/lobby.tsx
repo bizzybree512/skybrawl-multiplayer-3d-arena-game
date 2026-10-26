@@ -55,7 +55,6 @@ function Lobby() {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [aiCount, setAiCount] = useState(3)
-  const [joinedBots, setJoinedBots] = useState(0)
   const [ready, setReady] = useState(false)
   const [launchIn, setLaunchIn] = useState<number | null>(null)
   const [serverPlayers, setServerPlayers] = useState<LobbyPlayer[]>([])
@@ -83,7 +82,7 @@ function Lobby() {
       if (message.type === 'lobby') {
         setRoomCode(message.code)
         setServerHostId(message.hostId)
-        setServerPlayers((message.players || []).map((p) => ({
+        setServerPlayers((message.players || []).map((p: {id:string;name:string;color:string;isHost:boolean;isBot:boolean;ready:boolean}) => ({
           id: p.id, name: p.name, liveryId: LIVERIES.find(l => l.color.toLowerCase() === String(p.color).toLowerCase())?.id ?? LIVERIES[0].id,
           isHost: !!p.isHost, isBot: !!p.isBot, ready: !!p.ready,
         })))
@@ -95,7 +94,7 @@ function Lobby() {
       }
     })
     if (mode === 'create') {
-      connectMultiplayer().then(() => sendMultiplayer({ type: 'create', name: (name.trim() || 'DRIVER').toUpperCase().slice(0,12), color: LIVERIES.find(l=>l.id===liveryId)?.color ?? LIVERIES[0].color })).catch(e => {
+      connectMultiplayer().then(() => sendMultiplayer({ type: 'create', name: (name.trim() || 'DRIVER').toUpperCase().slice(0,12), color: LIVERIES.find(l=>l.id===liveryId)?.color ?? LIVERIES[0].color)).catch(e => {
         if (active) { setServerError(e instanceof Error ? e.message : 'Could not connect to multiplayer.'); toast.error(e instanceof Error ? e.message : 'Could not connect to multiplayer.') }
       })
     }
@@ -341,8 +340,6 @@ function Lobby() {
   )
 }
 
-function myColor(id: string) { return liveryById(id).color }
-
 function RoomCodeCard({ code, onCopy }: { code: string | null; onCopy: () => void }) {
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl border border-primary/40 bg-primary/5 p-4">
@@ -366,7 +363,7 @@ function RoomCodeCard({ code, onCopy }: { code: string | null; onCopy: () => voi
     setServerError(null)
     try {
       await connectMultiplayer()
-      sendMultiplayer({ type: 'join', code, name: driverName, color: myColor(liveryId) })
+      sendMultiplayer({ type: 'join', code, name: driverName, color: liveryById(liveryId).color })
       setRoomCode(code)
       setConnecting(false)
     } catch (error) {
