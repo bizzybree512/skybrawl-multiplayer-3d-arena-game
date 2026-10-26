@@ -85,6 +85,9 @@ function Lobby() {
           isHost: !!p.isHost, isBot: !!p.isBot, ready: !!p.ready,
         })))
         setServerError(null)
+        if (message.started && mode === 'join') {
+          navigate({ to: '/play', search: { code: message.code, name: (name.trim() || 'DRIVER').toUpperCase().slice(0,12), livery: liveryId, rivals: '' } })
+        }
       } else if (message.type === 'error') {
         setServerError(message.message || 'Could not connect to that room.')
         setConnecting(false)
