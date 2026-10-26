@@ -1,0 +1,13 @@
+{
+  "name": "skybrawl-multiplayer-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts",
+    "dev": "tsx watch index.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
