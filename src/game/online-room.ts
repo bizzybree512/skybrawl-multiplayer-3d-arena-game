@@ -25,8 +25,8 @@ export class OnlineRoom implements RoomClient {
       this.state = {
         ...raw,
         cars: raw.cars.map(car => ({ ...car, id: car.id === ownId ? LOCAL_ID : car.id })),
-        roundWinner: raw.roundWinner === ownId ? LOCAL_ID : raw.roundWinner,
-        matchWinner: raw.matchWinner === ownId ? LOCAL_ID : raw.matchWinner,
+        roundWinner: raw.roundWinner && raw.roundWinner === ownId ? LOCAL_ID : raw.roundWinner,
+        matchWinner: raw.matchWinner && raw.matchWinner === ownId ? LOCAL_ID : raw.matchWinner,
       }
       this.events.push(...(message.events as GameEvent[] || []).map(event => mapEvent(event, ownId)))
     })
