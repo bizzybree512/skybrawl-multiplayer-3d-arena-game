@@ -54,7 +54,6 @@ function Lobby() {
   const [joinCode, setJoinCode] = useState(search.code ?? '')
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
-  const [aiCount, setAiCount] = useState(3)
   const [ready, setReady] = useState(false)
   const [launchIn, setLaunchIn] = useState<number | null>(null)
   const [serverPlayers, setServerPlayers] = useState<LobbyPlayer[]>([])
@@ -125,7 +124,6 @@ function Lobby() {
     try {
       await connectMultiplayer()
       sendMultiplayer({ type: 'join', code, name: driverName, color: liveryById(liveryId).color })
-      setRoomCode(code)
       setConnecting(false)
     } catch (error) {
       setConnecting(false)
@@ -241,27 +239,7 @@ function Lobby() {
 
             <TabsContent value="create" className="mt-5">
               <RoomCodeCard code={roomCode} onCopy={copyInvite} />
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">AI drivers filling open seats</p>
-                <div className="flex gap-1 rounded-lg border bg-background/40 p-1">
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => {
-                        setAiCount(n)
-                        setJoinedBots((j) => Math.min(j, n))
-                      }}
-                      className={cn(
-                        'font-display rounded-md px-3 py-1 text-sm',
-                        aiCount === n ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="mt-5 text-sm text-muted-foreground">Waiting for friends to join. AI rivals fill remaining seats once the match starts.</p>
             </TabsContent>
 
             <TabsContent value="join" className="mt-5">
