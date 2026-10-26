@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, PlayerInput } from './sim'
+import type { GameEvent, GameState } from './sim'
 
 type Message = Record<string, any>
 type Listener = (message: Message) => void
