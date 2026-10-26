@@ -55,7 +55,6 @@ function Lobby() {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [ready, setReady] = useState(false)
-  const [launchIn, setLaunchIn] = useState<number | null>(null)
   const [serverPlayers, setServerPlayers] = useState<LobbyPlayer[]>([])
   const [serverHostId, setServerHostId] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -101,7 +100,6 @@ function Lobby() {
   }, [mode])
 
   const driverName = (name.trim() || 'DRIVER').toUpperCase().slice(0, 12)
-  const otherLiveries = LIVERIES.filter((l) => l.id !== liveryId)
 
   const roster: LobbyPlayer[] = serverPlayers.length ? serverPlayers : [{
     id: 'me', name: driverName, liveryId, isHost: isHost, isBot: false, ready: isHost || ready,
@@ -318,13 +316,9 @@ function Lobby() {
                 className="h-12 w-full text-base font-bold"
                 onClick={() => { setReady(r => !r); sendMultiplayer({ type: 'ready', ready: !ready }) }}
               >
-                {launchIn !== null ? (
-                  <>Host is starting in {launchIn}… (tap to cancel)</>
-                ) : (
-                  <>
-                    <Check /> I'm ready
-                  </>
-                )}
+                <>
+                  <Check /> {ready ? 'Ready — waiting for host' : "I'm ready"}
+                </>
               </Button>
             ) : null}
             <p className="mt-3 text-center text-xs text-muted-foreground">
