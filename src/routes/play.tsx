@@ -16,6 +16,7 @@ import { POWERUP_COLORS } from '@/game/colors'
 import { BOT_DRIVERS, LIVERIES, liveryById, normalizeRoomCode } from '@/game/fixtures'
 import { InputController } from '@/game/input'
 import { LocalPracticeRoom } from '@/game/room'
+import { OnlineRoom } from '@/game/online-room'
 import type { RoomClient } from '@/game/room'
 import {
   DASH_COOLDOWN,
@@ -154,7 +155,7 @@ function Play() {
   const seq = useRef(0)
 
   useEffect(() => {
-    const r = buildRoom(search)
+    const r = search.code ? new OnlineRoom() : buildRoom(search)
     setRoom(r)
     return () => r.dispose()
   }, [search])

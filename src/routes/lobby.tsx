@@ -22,14 +22,12 @@ import { CarIcon } from '@/components/game/car-icon'
 import { RulesList } from '@/components/game/rules'
 import {
   LIVERIES,
-  STUB_LOBBY_JOINERS,
-  STUB_REMOTE_HOST,
-  generateRoomCode,
   isValidRoomCode,
   liveryById,
   normalizeRoomCode,
 } from '@/game/fixtures'
 import type { LobbyPlayer } from '@/game/fixtures'
+import { connectMultiplayer, sendMultiplayer, subscribeMultiplayer } from '@/game/online-network'
 import { MAX_PLAYERS } from '@/game/sim'
 import { cn } from '@/lib/utils'
 
@@ -56,10 +54,10 @@ function Lobby() {
   const [joinCode, setJoinCode] = useState(search.code ?? '')
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
-  const [aiCount, setAiCount] = useState(3)
-  const [joinedBots, setJoinedBots] = useState(0)
   const [ready, setReady] = useState(false)
-  const [launchIn, setLaunchIn] = useState<number | null>(null)
+  const [serverPlayers, setServerPlayers] = useState<LobbyPlayer[]>([])
+  const [serverHostId, setServerHostId] = useState<string | null>(null)
+  const [serverError, setServerError] = useState<string | null>(null)
 
   // Remember the driver between visits.
   useEffect(() => {
@@ -75,81 +73,47 @@ function Lobby() {
   const isHost = mode === 'create'
   const inRoom = roomCode !== null
 
-  // Creating: a code is minted and rivals trickle in.
   useEffect(() => {
-    if (mode !== 'create') return
-    setRoomCode(generateRoomCode())
-    setJoinedBots(0)
-    setReady(false)
+    let active = true
+    const unsubscribe = subscribeMultiplayer(message => {
+      if (!active) return
+      if (message.type === 'lobby') {
+        setRoomCode(message.code)
+        setServerHostId(message.hostId)
+        setServerPlayers((message.players || []).map((p: {id:string;name:string;color:string;isHost:boolean;isBot:boolean;ready:boolean}) => ({
+          id: p.id, name: p.name, liveryId: LIVERIES.find(l => l.color.toLowerCase() === String(p.color).toLowerCase())?.id ?? LIVERIES[0].id,
+          isHost: !!p.isHost, isBot: !!p.isBot, ready: !!p.ready,
+        })))
+        setServerError(null)
+        if (message.started && mode === 'join') {
+          navigate({ to: '/play', search: { code: message.code, name: (localStorage.getItem(NAME_KEY) || 'DRIVER').toUpperCase().slice(0,12), livery: localStorage.getItem(LIVERY_KEY) || LIVERIES[0].id, rivals: '' } })
+        }
+      } else if (message.type === 'error') {
+        setServerError(message.message || 'Could not connect to that room.')
+        setConnecting(false)
+        toast.error(message.message || 'Could not connect to that room.')
+      }
+    })
+    if (mode === 'create') {
+      connectMultiplayer().then(() => sendMultiplayer({ type: 'create', name: (name.trim() || 'DRIVER').toUpperCase().slice(0,12), color: LIVERIES.find(l=>l.id===liveryId)?.color ?? LIVERIES[0].color)).catch(e => {
+        if (active) { setServerError(e instanceof Error ? e.message : 'Could not connect to multiplayer.'); toast.error(e instanceof Error ? e.message : 'Could not connect to multiplayer.') }
+      })
+    }
+    return () => { active = false; unsubscribe() }
   }, [mode])
 
-  useEffect(() => {
-    if (!inRoom || joinedBots >= aiCount) return
-    const t = setTimeout(() => setJoinedBots((n) => n + 1), 550)
-    return () => clearTimeout(t)
-  }, [inRoom, joinedBots, aiCount])
-
-  // Joining: once you're ready the host kicks things off.
-  useEffect(() => {
-    if (isHost || !inRoom || !ready) {
-      setLaunchIn(null)
-      return
-    }
-    setLaunchIn(3)
-  }, [isHost, inRoom, ready])
-
   const driverName = (name.trim() || 'DRIVER').toUpperCase().slice(0, 12)
-  const otherLiveries = LIVERIES.filter((l) => l.id !== liveryId)
 
-  const roster: LobbyPlayer[] = (() => {
-    const me: LobbyPlayer = {
-      id: 'me',
-      name: driverName,
-      liveryId,
-      isHost,
-      isBot: false,
-      ready: isHost || ready,
-    }
-    if (!inRoom) return [me]
-    if (isHost) {
-      return [
-        me,
-        ...STUB_LOBBY_JOINERS.slice(0, Math.min(joinedBots, aiCount)).map((p, i) => ({
-          ...p,
-          liveryId: otherLiveries[i].id,
-        })),
-      ]
-    }
-    return [
-      { ...STUB_REMOTE_HOST, liveryId: otherLiveries[0].id },
-      me,
-      ...STUB_LOBBY_JOINERS.slice(0, Math.min(joinedBots, aiCount - 1)).map((p, i) => ({
-        ...p,
-        liveryId: otherLiveries[i + 1].id,
-      })),
-    ]
-  })()
+  const roster: LobbyPlayer[] = serverPlayers.length ? serverPlayers : [{
+    id: 'me', name: driverName, liveryId, isHost: isHost, isBot: false, ready: isHost || ready,
+  }]
 
   const startMatch = () => {
-    const rivals = roster.filter((p) => p.isBot).map((p) => p.name)
-    navigate({
-      to: '/play',
-      search: { code: roomCode ?? undefined, name: driverName, livery: liveryId, rivals: rivals.join(',') },
-    })
+    sendMultiplayer({ type: 'start' })
+    navigate({ to: '/play', search: { code: roomCode ?? undefined, name: driverName, livery: liveryId, rivals: '' } })
   }
 
-  useEffect(() => {
-    if (launchIn === null) return
-    if (launchIn <= 0) {
-      startMatch()
-      return
-    }
-    const t = setTimeout(() => setLaunchIn((n) => (n === null ? null : n - 1)), 1000)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [launchIn])
-
-  const joinRoom = (e: React.FormEvent) => {
+  const joinRoom = async (e: React.FormEvent) => {
     e.preventDefault()
     const code = normalizeRoomCode(joinCode)
     if (!isValidRoomCode(code)) {
@@ -157,12 +121,17 @@ function Lobby() {
       return
     }
     setConnecting(true)
-    setTimeout(() => {
+    setServerError(null)
+    try {
+      await connectMultiplayer()
+      sendMultiplayer({ type: 'join', code, name: driverName, color: liveryById(liveryId).color })
       setConnecting(false)
-      setRoomCode(code)
-      setJoinedBots(0)
-      setAiCount(3)
-    }, 700)
+    } catch (error) {
+      setConnecting(false)
+      const message = error instanceof Error ? error.message : 'Could not connect to multiplayer.'
+      setServerError(message)
+      toast.error(message)
+    }
   }
 
   const copyInvite = async () => {
@@ -185,7 +154,7 @@ function Lobby() {
   }
 
   const myLivery = liveryById(liveryId)
-  const canStart = roster.length >= 2
+  const canStart = roster.filter(p => !p.isBot).length >= 2 && (serverHostId ? serverPlayers.some(p => p.id === serverHostId) : true)
 
   return (
     <div className="grid-backdrop min-h-screen">
@@ -271,27 +240,7 @@ function Lobby() {
 
             <TabsContent value="create" className="mt-5">
               <RoomCodeCard code={roomCode} onCopy={copyInvite} />
-              <div className="mt-5 flex items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">AI drivers filling open seats</p>
-                <div className="flex gap-1 rounded-lg border bg-background/40 p-1">
-                  {[1, 2, 3].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => {
-                        setAiCount(n)
-                        setJoinedBots((j) => Math.min(j, n))
-                      }}
-                      className={cn(
-                        'font-display rounded-md px-3 py-1 text-sm',
-                        aiCount === n ? 'bg-primary text-primary-foreground' : 'text-muted-foreground',
-                      )}
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <p className="mt-5 text-sm text-muted-foreground">Waiting for friends to join. AI rivals fill remaining seats once the match starts.</p>
             </TabsContent>
 
             <TabsContent value="join" className="mt-5">
@@ -346,7 +295,7 @@ function Lobby() {
                   >
                     <CarIcon color={l.color} className="size-9" />
                     <span className="font-display font-bold">{p.name}</span>
-                    {p.id === 'me' && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">YOU</span>}
+                    {(p.id === 'me' || p.name === driverName) && <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">YOU</span>}
                     {p.isHost && <Crown className="size-4 text-amber-300" aria-label="Host" />}
                     {p.isBot && <Bot className="size-4 text-muted-foreground" aria-label="AI driver" />}
                     <span className={cn('ml-auto text-xs font-semibold', p.ready ? 'text-lime-300' : 'text-muted-foreground')}>
@@ -368,19 +317,15 @@ function Lobby() {
                 size="lg"
                 variant={ready ? 'secondary' : 'default'}
                 className="h-12 w-full text-base font-bold"
-                onClick={() => setReady((r) => !r)}
+                onClick={() => { setReady(r => !r); sendMultiplayer({ type: 'ready', ready: !ready }) }}
               >
-                {launchIn !== null ? (
-                  <>Host is starting in {launchIn}… (tap to cancel)</>
-                ) : (
-                  <>
-                    <Check /> I'm ready
-                  </>
-                )}
+                <>
+                  <Check /> {ready ? 'Ready — waiting for host' : "I'm ready"}
+                </>
               </Button>
             ) : null}
             <p className="mt-3 text-center text-xs text-muted-foreground">
-              Preview build: open seats are filled by AI drivers while live online rooms are being wired up.
+              {serverError ?? (inRoom ? 'Connected lobby · invite friends with the room code.' : 'Create a room or join a friend to play online.')}
             </p>
           </div>
         </section>
