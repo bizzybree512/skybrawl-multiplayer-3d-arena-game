@@ -86,7 +86,7 @@ function Lobby() {
         })))
         setServerError(null)
         if (message.started && mode === 'join') {
-          navigate({ to: '/play', search: { code: message.code, name: (name.trim() || 'DRIVER').toUpperCase().slice(0,12), livery: liveryId, rivals: '' } })
+          navigate({ to: '/play', search: { code: message.code, name: (localStorage.getItem(NAME_KEY) || 'DRIVER').toUpperCase().slice(0,12), livery: localStorage.getItem(LIVERY_KEY) || LIVERIES[0].id, rivals: '' } })
         }
       } else if (message.type === 'error') {
         setServerError(message.message || 'Could not connect to that room.')
